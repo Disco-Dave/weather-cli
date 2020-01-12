@@ -3,6 +3,7 @@ module Weather.Cli.Types
   ( 
   -- * US Zip Code
     UsZipCode
+  , UsZipCodeError(..)
   , makeUsZipCode
   , fromUsZipCode
 
