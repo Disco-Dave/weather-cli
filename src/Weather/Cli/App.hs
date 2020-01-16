@@ -3,5 +3,5 @@ module Weather.Cli.App where
 import           Relude
 
 
-newtype MonadApp a = MonadApp { fromMonadApp :: Identity a }
-  deriving (Show, Functor, Applicative, Monad)
+newtype MonadApp a = MonadApp { fromMonadApp :: IO a }
+  deriving (Functor, Applicative, Monad, MonadIO)

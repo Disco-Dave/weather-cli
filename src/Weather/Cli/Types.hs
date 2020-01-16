@@ -9,6 +9,10 @@ module Weather.Cli.Types
 
   -- * Measurement Unit
   , MeasurementUnit(..)
+
+  -- * Request/Response
+  , WeatherRequest(..)
+  , WeatherResponse(..)
   )
 where
 
@@ -72,3 +76,25 @@ data MeasurementUnit
   | Imperial
   | Metric
   deriving (Show, Eq)
+
+
+
+-- * Request/Response
+
+-- | A request that holds the information required to get the weather.
+data WeatherRequest = WeatherRequest
+  { reqUsZipCode :: UsZipCode
+  , reqMeasureUnit :: MeasurementUnit
+  } deriving Show
+
+-- | A response that describes the weather.
+data WeatherResponse = WeatherResponse
+  { respMain :: Text 
+  , respDescription :: Text
+  , respTemperature :: Float
+  , respFeelsLike :: Float
+  , respMinTemperature :: Float
+  , respMaxTemperature :: Float
+  , respPressure :: Integer
+  , respHumidity :: Integer
+  } deriving Show
