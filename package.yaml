@@ -42,8 +42,10 @@ ghc-options:
 dependencies:
 - base >= 4.7 && < 5
 - containers
+- lens
 - relude
 - text
+- wreq
 
 library:
   source-dirs: src

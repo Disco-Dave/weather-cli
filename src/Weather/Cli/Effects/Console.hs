@@ -17,12 +17,7 @@ class Monad m => Console m where
 readValueFromStdIn :: (Console m, Read a) => m (Maybe a)
 readValueFromStdIn = fmap (readMaybe . toString) readFromStdIn
 
-instance Console IO where
-  readFromStdIn = getLine
-  writeLineToStdOut output = putStrLn (toString output)
-  writeLineToStdErr output = hPutStrLn stderr (toString output)
-
 instance Console MonadApp where
-  readFromStdIn = liftIO readFromStdIn
-  writeLineToStdOut = liftIO . writeLineToStdOut
-  writeLineToStdErr = liftIO . writeLineToStdErr
+  readFromStdIn = getLine
+  writeLineToStdOut output = liftIO . putStrLn $ toString output
+  writeLineToStdErr output = liftIO . hPutStrLn stderr $ toString output
