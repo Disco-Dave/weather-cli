@@ -52,7 +52,7 @@ measurementUnit = do
     "standard" -> pure Standard
     "metric"   -> pure Metric
     _          -> fail
-      "Unknown measurement unit. Options are imperial, standard, and metric."
+      "Unknown measurement unit. Options are imperial, standard, or metric."
 
 usZipCode :: ReadM UsZipCode
 usZipCode = do
