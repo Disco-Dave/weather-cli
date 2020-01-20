@@ -46,6 +46,8 @@ dependencies:
 - base >= 4.7 && < 5
 - aeson
 - containers
+- directory
+- filepath
 - http-client
 - optparse-applicative
 - relude

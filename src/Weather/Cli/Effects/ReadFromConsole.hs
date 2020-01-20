@@ -36,13 +36,14 @@ weatherRequestParser =
     <$> option
           measurementUnit
           (long "unit" 
+            <> metavar "UNIT"
             <> showDefault
             <> short 'u' 
             <> value Imperial 
             <> help "Measurement unit. Imperial, standard, or metric."
           )
     <*> argument usZipCode
-                 (metavar "zipcode" <> help "United States zip code.")
+                 (metavar "ZIPCODE" <> help "United States zip code.")
 
 measurementUnit :: ReadM MeasurementUnit
 measurementUnit = do
