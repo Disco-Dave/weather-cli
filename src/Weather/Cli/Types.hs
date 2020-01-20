@@ -86,8 +86,8 @@ data MeasurementUnit
 
 -- | A request that holds the information required to get the weather.
 data WeatherRequest = WeatherRequest
-  { reqUsZipCode :: UsZipCode
-  , reqMeasureUnit :: MeasurementUnit
+  { reqMeasureUnit :: MeasurementUnit
+  , reqUsZipCode :: UsZipCode
   } deriving Show
 
 -- | A response that describes the weather.
