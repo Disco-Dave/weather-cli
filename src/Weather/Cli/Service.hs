@@ -3,11 +3,13 @@ module Weather.Cli.Service where
 import           Relude
 
 import           Weather.Cli.Effects.Console    ( Console )
-import           Weather.Cli.Effects.RemoteWeatherApi ( RemoteWeatherApi)
+import           Weather.Cli.Effects.RemoteWeatherApi.Class
+                                                ( RemoteWeatherApi )
 import           Weather.Cli.Types
 
 import qualified Weather.Cli.Effects.Console   as Console
-import qualified Weather.Cli.Effects.RemoteWeatherApi as RemoteWeatherApi
+import qualified Weather.Cli.Effects.RemoteWeatherApi.Class
+                                               as RemoteWeatherApi
 
 
 reportWeather :: (Console m, RemoteWeatherApi m) => WeatherRequest -> m ()
@@ -31,7 +33,7 @@ formatWeather unit WeatherResponse {..} =
   minTemperature  = show respMinTemperature <> " " <> temperatureUnit
   maxTemperature  = show respMaxTemperature <> " " <> temperatureUnit
   feelsLike       = show respFeelsLike <> " " <> temperatureUnit
-  weather         = show respMain <> ". " <> show respDescription
+  weather         = toText respMain <> " - " <> toText respDescription
   pressure        = show respPressure <> " hPa"
   humidity        = show respHumidity <> "%"
   temperatureUnit = case unit of

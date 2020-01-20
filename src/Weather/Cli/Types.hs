@@ -13,6 +13,9 @@ module Weather.Cli.Types
   -- * Request/Response
   , WeatherRequest(..)
   , WeatherResponse(..)
+
+  -- * Re-exports
+  , Validation(..)
   )
 where
 
@@ -95,6 +98,6 @@ data WeatherResponse = WeatherResponse
   , respFeelsLike :: Float
   , respMinTemperature :: Float
   , respMaxTemperature :: Float
-  , respPressure :: Integer
-  , respHumidity :: Integer
+  , respPressure :: Int
+  , respHumidity :: Int
   } deriving Show

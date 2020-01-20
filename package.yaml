@@ -20,6 +20,8 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/Disco-Dave/weather-cli#readme>
 
 default-extensions:
+- DataKinds
+- FlexibleInstances
 - FunctionalDependencies
 - GeneralizedNewtypeDeriving
 - MultiParamTypeClasses
@@ -29,6 +31,7 @@ default-extensions:
 - RecordWildCards
 - ScopedTypeVariables
 - TypeApplications
+- TypeOperators
 
 ghc-options:
 - -Wall
@@ -41,11 +44,13 @@ ghc-options:
 
 dependencies:
 - base >= 4.7 && < 5
+- aeson
 - containers
-- lens
+- http-client
 - relude
+- servant
+- servant-client
 - text
-- wreq
 
 library:
   source-dirs: src
