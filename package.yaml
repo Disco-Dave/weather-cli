@@ -47,6 +47,7 @@ dependencies:
 - aeson
 - containers
 - http-client
+- optparse-applicative
 - relude
 - servant
 - servant-client
@@ -56,7 +57,7 @@ library:
   source-dirs: src
 
 executables:
-  weather-cli-exe:
+  weather:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
