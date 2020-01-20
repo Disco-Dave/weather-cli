@@ -1,4 +1,4 @@
-module Weather.Cli.Effects.Console where
+module Weather.Cli.Effects.WriteToConsole where
 
 import           Relude
 
@@ -9,15 +9,10 @@ import           System.IO                      ( hPutStrLn
                                                 )
 
 
-class Monad m => Console m where
-  readFromStdIn :: m Text
+class Monad m => WriteToConsole m where
   writeLineToStdOut :: Text -> m ()
   writeLineToStdErr :: Text -> m ()
 
-readValueFromStdIn :: (Console m, Read a) => m (Maybe a)
-readValueFromStdIn = fmap (readMaybe . toString) readFromStdIn
-
-instance Console MonadApp where
-  readFromStdIn = getLine
+instance WriteToConsole MonadApp where
   writeLineToStdOut output = liftIO . putStrLn $ toString output
   writeLineToStdErr output = liftIO . hPutStrLn stderr $ toString output

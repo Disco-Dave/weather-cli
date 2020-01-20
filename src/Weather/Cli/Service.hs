@@ -2,21 +2,19 @@ module Weather.Cli.Service where
 
 import           Relude
 
-import           Weather.Cli.Effects.Console    ( Console )
-import           Weather.Cli.Effects.RemoteWeatherApi.Class
-                                                ( RemoteWeatherApi )
+import           Weather.Cli.Effects.WriteToConsole         ( WriteToConsole )
+import           Weather.Cli.Effects.RemoteWeatherApi.Class ( RemoteWeatherApi )
 import           Weather.Cli.Types
 
-import qualified Weather.Cli.Effects.Console   as Console
-import qualified Weather.Cli.Effects.RemoteWeatherApi.Class
-                                               as RemoteWeatherApi
+import qualified Weather.Cli.Effects.WriteToConsole         as WriteToConsole
+import qualified Weather.Cli.Effects.RemoteWeatherApi.Class as RemoteWeatherApi
 
 
-reportWeather :: (Console m, RemoteWeatherApi m) => WeatherRequest -> m ()
+reportWeather :: (WriteToConsole m, RemoteWeatherApi m) => WeatherRequest -> m ()
 reportWeather request@WeatherRequest {..} =
   RemoteWeatherApi.getWeather request >>= either
-    (Console.writeLineToStdErr . show)
-    (Console.writeLineToStdOut . formatWeather reqMeasureUnit)
+    (WriteToConsole.writeLineToStdErr . show)
+    (WriteToConsole.writeLineToStdOut . formatWeather reqMeasureUnit)
 
 
 formatWeather :: MeasurementUnit -> WeatherResponse -> Text

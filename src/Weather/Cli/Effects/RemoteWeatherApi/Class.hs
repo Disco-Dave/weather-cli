@@ -65,17 +65,17 @@ instance RemoteWeatherApi MonadApp where
         case fmap head . nonEmpty $ rawWeather responseBody of
           Nothing -> pure . Left $ MalformedResponse
           Just weather ->
-            let rawMain' = rawMain responseBody
-            in  pure . Right $ WeatherResponse
-                  { respMain           = main weather
-                  , respDescription    = description weather
-                  , respTemperature    = temp rawMain'
-                  , respFeelsLike      = feelsLike rawMain'
-                  , respMinTemperature = tempMin rawMain'
-                  , respMaxTemperature = tempMax rawMain'
-                  , respPressure       = pressure rawMain'
-                  , respHumidity       = humidity rawMain'
-                  }
+            let RawMain {..}    = rawMain responseBody
+                RawWeather {..} = weather
+            in  pure . Right $ WeatherResponse { respMain           = main
+                                               , respDescription = description
+                                               , respTemperature    = temp
+                                               , respFeelsLike      = feelsLike
+                                               , respMinTemperature = tempMin
+                                               , respMaxTemperature = tempMax
+                                               , respPressure       = pressure
+                                               , respHumidity       = humidity
+                                               }
 
 
 data RawWeather = RawWeather
