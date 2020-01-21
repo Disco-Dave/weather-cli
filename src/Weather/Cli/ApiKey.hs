@@ -12,7 +12,13 @@ getApiKey :: IO Text
 getApiKey = do
   configDir <- (</> "weather") <$> getXdgDirectory XdgConfig ""
   let apiKeyFile = configDir </> "api_key"
+  doesConfigFolderExist <- doesDirectoryExist configDir 
+
+  unless doesConfigFolderExist $
+    createDirectoryIfMissing True configDir
+
   doesApiKeyExist <- doesFileExist apiKeyFile
+
   if doesApiKeyExist
     then Text.strip <$> readFileText apiKeyFile
     else do
