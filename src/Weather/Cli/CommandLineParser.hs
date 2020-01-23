@@ -39,13 +39,13 @@ commandParser = OptParse.info parser infoModifer
   parser          = OptParse.helper <*> OptParse.subparser commands
   descriptionText = "Get the weather report for a zip code"
   headerText      = "weather - weather report per zip code"
-  commands =
-    OptParse.command "set" setApiKeyParser
-      <> OptParse.command "current" getCurrentWeather
   infoModifer =
     OptParse.fullDesc
       <> OptParse.progDesc descriptionText
       <> OptParse.header headerText
+  commands =
+    OptParse.command "set" setApiKeyParser
+      <> OptParse.command "current" getCurrentWeather
 
 
 
