@@ -14,6 +14,9 @@ module Weather.Cli.Types
   , WeatherRequest(..)
   , WeatherResponse(..)
 
+  -- * Commands
+  , Command(..)
+
   -- * Re-exports
   , Validation(..)
   )
@@ -101,3 +104,11 @@ data WeatherResponse = WeatherResponse
   , respPressure :: Int
   , respHumidity :: Int
   } deriving Show
+
+
+-- * Commands
+
+data Command
+  = SetApiKey Text
+  | GetCurrentWeather WeatherRequest
+  deriving Show
