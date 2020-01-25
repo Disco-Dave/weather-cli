@@ -15,13 +15,13 @@ import qualified Weather.Cli.Effects.WriteToConsole         as WriteToConsole
 reportWeather :: (WriteToConsole m, RemoteWeatherApi m, ReadFromConsole m) => m ()
 reportWeather = do
   req@WeatherRequest {..} <- ReadFromConsole.getRequest
-  RemoteWeatherApi.getWeather req >>= either
+  RemoteWeatherApi.getCurrentWeather req >>= either
     (WriteToConsole.writeLineToStdErr . show)
     (WriteToConsole.writeLineToStdOut . formatWeather reqMeasureUnit)
 
 
-formatWeather :: MeasurementUnit -> WeatherResponse -> Text
-formatWeather unit WeatherResponse {..} =
+formatWeather :: MeasurementUnit -> CurrentWeatherResponse -> Text
+formatWeather unit CurrentWeatherResponse {..} =
   "Weather: " <> weather <> "\n"
     <> "Temperature: " <> temperature <> "\n"
     <> "Min temperature: " <> minTemperature <> "\n"

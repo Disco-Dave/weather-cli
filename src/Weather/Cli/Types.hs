@@ -12,7 +12,7 @@ module Weather.Cli.Types
 
   -- * Request/Response
   , WeatherRequest(..)
-  , WeatherResponse(..)
+  , CurrentWeatherResponse(..)
 
   -- * Commands
   , Command(..)
@@ -94,7 +94,7 @@ data WeatherRequest = WeatherRequest
   } deriving Show
 
 -- | A response that describes the weather.
-data WeatherResponse = WeatherResponse
+data CurrentWeatherResponse = CurrentWeatherResponse
   { respMain :: Text 
   , respDescription :: Text
   , respTemperature :: Float

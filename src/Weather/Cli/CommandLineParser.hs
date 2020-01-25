@@ -1,5 +1,7 @@
 module Weather.Cli.CommandLineParser
-  ( getCommand
+  ( ParseArgsResult
+  , runParseArgsResult
+  , parseArgsResultsToMaybe
   , parseArguments
   )
 where
@@ -8,32 +10,34 @@ import           Relude
 
 import           Weather.Cli.Types
 
-import           Options.Applicative            ( Parser
-                                                , ParserInfo
-                                                , ReadM
-                                                )
-
 import qualified Data.Char                     as Char
 import qualified Data.List                     as List
 import qualified Data.Text                     as Text
 import qualified Options.Applicative           as OptParse
 
 
--- * Command Line parser runners
+-- * Command Line parser runner
 
-getCommand :: MonadIO m => m Command
-getCommand = liftIO $ OptParse.execParser commandParser
+newtype ParseArgsResult a = ParseArgsResults
+  ( OptParse.ParserResult a
+  ) deriving (Functor, Applicative, Monad)
 
-parseArguments :: [Text] -> OptParse.ParserResult Command
-parseArguments = OptParse.execParserPure prefs commandParser . fmap toString
-  where prefs = OptParse.prefs mempty
+parseArguments :: [Text] -> ParseArgsResult Command
+parseArguments = coerce . execParser . fmap toString
+ where
+  execParser = OptParse.execParserPure prefs commandParser
+  prefs      = OptParse.prefs OptParse.idm
 
+runParseArgsResult :: ParseArgsResult a -> IO a
+runParseArgsResult = OptParse.handleParseResult . coerce
 
+parseArgsResultsToMaybe :: ParseArgsResult a -> Maybe a
+parseArgsResultsToMaybe = OptParse.getParseResult . coerce
 
 
 -- * Top level command parser
 
-commandParser :: ParserInfo Command
+commandParser :: OptParse.ParserInfo Command
 commandParser = OptParse.info parser infoModifer
  where
   parser          = OptParse.helper <*> OptParse.subparser commands
@@ -51,7 +55,7 @@ commandParser = OptParse.info parser infoModifer
 
 -- * Sub Parsers
 
-setApiKeyParser :: ParserInfo Command
+setApiKeyParser :: OptParse.ParserInfo Command
 setApiKeyParser = OptParse.info parser infoModifier
  where
   parser       = SetApiKey <$> OptParse.argument OptParse.str modifier
@@ -64,14 +68,14 @@ setApiKeyParser = OptParse.info parser infoModifier
     "Set the API key associated with your account "
       <> "registered on https://openweathermap.org/"
 
-getCurrentWeather :: ParserInfo Command
+getCurrentWeather :: OptParse.ParserInfo Command
 getCurrentWeather = OptParse.info parser infoModifer
  where
   parser          = fmap GetCurrentWeather weatherRequestParser
   infoModifer     = OptParse.fullDesc <> OptParse.progDesc descriptionText
   descriptionText = "Get the current weather"
 
-weatherRequestParser :: Parser WeatherRequest
+weatherRequestParser :: OptParse.Parser WeatherRequest
 weatherRequestParser =
   WeatherRequest <$> measurementUnitOption <*> usZipCodeArguement
  where
@@ -89,11 +93,11 @@ weatherRequestParser =
       <> OptParse.help "Measurement unit. Imperial, standard, or metric."
 
 
-      
+
 
 -- * Custom 'ReadM' values
 
-measurementUnit :: ReadM MeasurementUnit
+measurementUnit :: OptParse.ReadM MeasurementUnit
 measurementUnit = do
   rawMeasurementUnit <- Text.map Char.toLower <$> OptParse.str
   case rawMeasurementUnit of
@@ -103,13 +107,12 @@ measurementUnit = do
     _          -> fail
       "Unknown measurement unit. Options are imperial, standard, or metric."
 
-usZipCode :: ReadM UsZipCode
+usZipCode :: OptParse.ReadM UsZipCode
 usZipCode = do
   rawUsZipCode <- fmap makeUsZipCode OptParse.str
   case rawUsZipCode of
     Success validZipCode -> pure validZipCode
-    Failure errors ->
-      fail . List.unwords . fmap toErrorMessage $ toList errors
+    Failure errors -> fail . List.unwords . fmap toErrorMessage $ toList errors
  where
   toErrorMessage ContainsMoreThanDigitsUsZipCodeError =
     "Zip code may only contain digits."

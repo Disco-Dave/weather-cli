@@ -8,7 +8,13 @@ import           Relude
 
 import           Weather.Cli.CommandLineParser
 
+import           System.Environment
+
+getArgsText :: IO [Text]
+getArgsText = fmap toText <$> getArgs
+
 main :: IO ()
-main = getCommand >>= print
+main = getArgsText >>= (runParseArgsResult . parseArguments) >>= print
+  --
   --env <- getApiKey >>= makeEnv
   --runMonadApp env reportWeather

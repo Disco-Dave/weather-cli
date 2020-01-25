@@ -37,12 +37,12 @@ instance Show RemoteWeatherApiError where
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
   -- | Get the weather report.
-  getWeather :: WeatherRequest -> m (Either RemoteWeatherApiError WeatherResponse)
+  getCurrentWeather :: WeatherRequest -> m (Either RemoteWeatherApiError CurrentWeatherResponse)
 
 
 
 instance RemoteWeatherApi MonadApp where
-  getWeather WeatherRequest {..} = do
+  getCurrentWeather WeatherRequest {..} = do
     RemoteWeatherApiEnv {..} <- asks remoteWeatherApiEnv
 
     let zipCode = fromUsZipCode reqUsZipCode <> ",us"
@@ -67,7 +67,7 @@ instance RemoteWeatherApi MonadApp where
           Just weather ->
             let RawMain {..}    = rawMain responseBody
                 RawWeather {..} = weather
-            in  pure . Right $ WeatherResponse { respMain           = main
+            in  pure . Right $ CurrentWeatherResponse { respMain           = main
                                                , respDescription = description
                                                , respTemperature    = temp
                                                , respFeelsLike      = feelsLike
