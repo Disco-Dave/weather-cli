@@ -6,18 +6,17 @@ module Weather.Cli.Effects.RemoteWeatherApi.Class
 
 import           Relude
 
-import           Weather.Cli.Types
 import           Weather.Cli.App
 import           Weather.Cli.Effects.RemoteWeatherApi.Env
 
-import           Data.Aeson                     ( FromJSON(..)
-                                                , (.:)
-                                                , withObject
-                                                )
+
+import           Data.Aeson
 import           Data.Proxy                     ( Proxy(..) )
 import           GHC.Show                       ( Show(..) )
 import           Servant.API
 import           Servant.Client
+
+import qualified Weather.Cli.Types             as Types
 
 
 -- | A error that can occur while interacting with the
@@ -37,20 +36,17 @@ instance Show RemoteWeatherApiError where
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
   -- | Get the weather report.
-  getCurrentWeather :: WeatherRequest -> m (Either RemoteWeatherApiError CurrentWeatherResponse)
+  getCurrentWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.CurrentWeatherResponse)
 
 
 
 instance RemoteWeatherApi MonadApp where
-  getCurrentWeather WeatherRequest {..} = do
+  getCurrentWeather Types.WeatherRequest {..} = do
     RemoteWeatherApiEnv {..} <- asks remoteWeatherApiEnv
 
-    let zipCode = fromUsZipCode reqUsZipCode <> ",us"
-        units   = case reqMeasureUnit of
-          Standard -> "standard"
-          Imperial -> "imperial"
-          Metric   -> "metric"
-        requestAction = getWeatherHttp zipCode units remoteApiKey
+    let zipCode       = UsZipCode reqUsZipCode
+        units         = MeasurementUnit reqMeasureUnit
+        requestAction = getWeatherHttp zipCode units (AppId remoteApiKey)
         status        = fromEnum . responseStatusCode
 
     rawResponse <- liftIO $ runClientM requestAction remoteClientEnv
@@ -61,70 +57,58 @@ instance RemoteWeatherApi MonadApp where
         | status r == 404 -> pure . Left $ ZipCodeNotFound
         | status r == 401 -> pure . Left $ Unauthorized
       Left _ -> pure . Left $ MalformedResponse
-      Right responseBody ->
-        case fmap head . nonEmpty $ rawWeather responseBody of
-          Nothing -> pure . Left $ MalformedResponse
-          Just weather ->
-            let RawMain {..}    = rawMain responseBody
-                RawWeather {..} = weather
-            in  pure . Right $ CurrentWeatherResponse { respMain           = main
-                                               , respDescription = description
-                                               , respTemperature    = temp
-                                               , respFeelsLike      = feelsLike
-                                               , respMinTemperature = tempMin
-                                               , respMaxTemperature = tempMax
-                                               , respPressure       = pressure
-                                               , respHumidity       = humidity
-                                               }
+      Right (CurrentWeatherResponse responseBody) ->
+        pure . Right $ responseBody
 
 
-data RawWeather = RawWeather
-  { main :: Text
-  , description :: Text
-  }
+newtype UsZipCode = UsZipCode Types.UsZipCode
 
-instance FromJSON RawWeather where
-  parseJSON = withObject "RawWeather" $ \v ->
-    RawWeather
-      <$> v .: "main"
-      <*> v .: "description"
+instance ToHttpApiData UsZipCode where
+  toUrlPiece (UsZipCode zipCode) = rawZipCode <> ",us"
+    where rawZipCode = Types.fromUsZipCode zipCode
 
-data RawMain = RawMain
-  { temp :: Float
-  , feelsLike :: Float
-  , tempMin :: Float
-  , tempMax :: Float
-  , pressure :: Int
-  , humidity :: Int
-  }
 
-instance FromJSON RawMain where
-  parseJSON = withObject "RawMain" $ \v ->
-    RawMain
-      <$> v .: "temp"
-      <*> v .: "feels_like"
-      <*> v .: "temp_min"
-      <*> v .: "temp_max"
-      <*> v .: "pressure"
-      <*> v .: "humidity"
+newtype MeasurementUnit = MeasurementUnit Types.MeasurementUnit
 
-data RawResponse = RawResponse
-  { rawWeather :: [RawWeather]
-  , rawMain :: RawMain
-  }
+instance ToHttpApiData MeasurementUnit where
+  toUrlPiece (MeasurementUnit measurementUnit) = case measurementUnit of
+    Types.Metric   -> "metric"
+    Types.Imperial -> "imperial"
+    Types.Standard -> "standard"
 
-instance FromJSON RawResponse where
-  parseJSON = withObject "RawResponse" $ \v ->
-    RawResponse
-      <$> v .: "weather"
-      <*> v .: "main"
+instance ToHttpApiData AppId where
+  toUrlPiece (AppId appId) = appId
 
-type OpenWeatherApi = 
-  "weather" 
-    :> QueryParam' '[Required] "zip" Text
-    :> QueryParam' '[Required] "units" Text
-    :> QueryParam' '[Required] "appid" Text
-    :> Get '[JSON] RawResponse
+newtype AppId = AppId Text
 
-getWeatherHttp :: Text -> Text -> Text -> ClientM RawResponse
+newtype CurrentWeatherResponse = CurrentWeatherResponse Types.CurrentWeatherResponse
+
+
+instance FromJSON CurrentWeatherResponse where
+  parseJSON = withObject "CurrentWeatherResponse" $ \value -> do
+    rawWeatherArray <- value .: "weather"
+    rawMain         <- value .: "main"
+    case rawWeatherArray of
+      []               -> fail "No weather information was sent"
+      (rawWeather : _) -> do
+        response <- Types.CurrentWeatherResponse
+          <$> rawWeather .: "main"
+          <*> rawWeather .: "description"
+          <*> rawMain    .: "temp"
+          <*> rawMain    .: "feels_like"
+          <*> rawMain    .: "temp_min"
+          <*> rawMain    .: "temp_max"
+          <*> rawMain    .: "pressure" 
+          <*> rawMain    .: "humidity" 
+        pure . coerce $ response
+
+
+type OpenWeatherApi =
+  "weather"
+    :> QueryParam' '[Required] "zip" UsZipCode
+    :> QueryParam' '[Required] "units" MeasurementUnit
+    :> QueryParam' '[Required] "appid" AppId
+    :> Get '[JSON] CurrentWeatherResponse
+
+getWeatherHttp :: UsZipCode -> MeasurementUnit -> AppId -> ClientM CurrentWeatherResponse
 getWeatherHttp = client $ Proxy @OpenWeatherApi
