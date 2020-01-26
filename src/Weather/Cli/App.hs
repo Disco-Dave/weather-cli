@@ -1,4 +1,11 @@
-module Weather.Cli.App where
+module Weather.Cli.App
+  ( MonadApp
+  , Env
+  , HasRemoteWeatherApiEnv(..)
+  , makeEnv
+  , runMonadApp
+  )
+where
 
 import           Relude
 
@@ -16,3 +23,9 @@ makeEnv = fmap Env makeRemoteWeatherApiEnv
 
 runMonadApp :: Env -> MonadApp a -> IO a
 runMonadApp env = usingReaderT env . fromMonadApp
+
+
+class Monad m => HasRemoteWeatherApiEnv m where
+  getRemoteWeatherApiEnv :: m RemoteWeatherApiEnv
+instance HasRemoteWeatherApiEnv MonadApp where
+  getRemoteWeatherApiEnv = asks remoteWeatherApiEnv

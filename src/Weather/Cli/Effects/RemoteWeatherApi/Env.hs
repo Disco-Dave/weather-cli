@@ -16,4 +16,3 @@ makeRemoteWeatherApiEnv = do
   let baseUrl'   = BaseUrl Http "api.openweathermap.org" 80 "data/2.5"
       clientEnv' = mkClientEnv manager' baseUrl'
   pure $ RemoteWeatherApiEnv clientEnv'
-

@@ -5,10 +5,13 @@ where
 
 import           Relude
 
-import           Weather.Cli.Effects.RemoteWeatherApi.Class ( RemoteWeatherApi )
-import           Weather.Cli.Effects.ApiKey                 ( GetApiKey
-                                                            , SetApiKey
-                                                            )
+import           Weather.Cli.Effects.ApiKey     ( GetApiKey
+                                                , SetApiKey
+                                                )
+import           Weather.Cli.Effects.RemoteWeatherApi.Class
+                                                ( RemoteWeatherApi
+                                                , RemoteWeatherApiError(..)
+                                                )
 import           Weather.Cli.Types
 
 import qualified Weather.Cli.Effects.RemoteWeatherApi.Class as RemoteWeatherApi
@@ -34,7 +37,7 @@ setApiKey apiKey = ApiKey.setApiKey apiKey $> Right "API Key was set."
 getCurrentWeather :: (GetApiKey m, RemoteWeatherApi m) => WeatherRequest -> m (Either Text Text)
 getCurrentWeather r@WeatherRequest {..} =
   RemoteWeatherApi.getCurrentWeather r
-    <&> bimap show (formatWeather reqMeasureUnit)
+    <&> bimap errorToText (formatWeather reqMeasureUnit)
 
 formatWeather :: MeasurementUnit -> CurrentWeatherResponse -> Text
 formatWeather unit CurrentWeatherResponse {..} =
@@ -57,3 +60,14 @@ formatWeather unit CurrentWeatherResponse {..} =
     Imperial -> "°F"
     Metric   -> "°C"
     Standard -> "K"
+
+
+
+-- * Shared functions
+
+errorToText :: RemoteWeatherApiError -> Text
+errorToText ZipCodeNotFound = "Unable to find the weather for requested zip code."
+errorToText UnableToReachServer = "Unable to reach to the remote server."
+errorToText MalformedResponse = "Response from server was not in the expected format."
+errorToText Unauthorized = "Unauthorized. This is likely due to an invalid API key."
+errorToText ApiKeyMissing = "API Key is not set."

@@ -12,7 +12,6 @@ import           Weather.Cli.Effects.RemoteWeatherApi.Env
 
 import           Data.Aeson
 import           Data.Proxy                     ( Proxy(..) )
-import           GHC.Show                       ( Show(..) )
 import           Servant.API
 import           Servant.Client
 
@@ -28,13 +27,6 @@ data RemoteWeatherApiError
   | Unauthorized
   | ApiKeyMissing
 
-instance Show RemoteWeatherApiError where
-  show ZipCodeNotFound = "Unable to find the weather for requested zip code."
-  show UnableToReachServer = "Unable to reach to the remote server."
-  show MalformedResponse = "Response from server was not in the expected format."
-  show Unauthorized = "Unauthorized. This is likely due to an invalid API key."
-  show ApiKeyMissing = "API Key is not set."
-
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
   -- | Get the weather report.
@@ -46,7 +38,7 @@ instance RemoteWeatherApi MonadApp where
   getCurrentWeather Types.WeatherRequest {..} =
     let zipCode = UsZipCode reqUsZipCode
         units   = MeasurementUnit reqMeasureUnit
-    in  fmap coerce . runHttp $ getWeatherHttp zipCode units
+    in  runHttp $ getWeatherHttp zipCode units
 
 
 newtype UsZipCode = UsZipCode Types.UsZipCode
@@ -98,26 +90,25 @@ type OpenWeatherApi =
     :> QueryParam' '[Required] "appid" ApiKey
     :> Get '[JSON] CurrentWeatherResponse
 
+getWeatherHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
+getWeatherHttp = client $ Proxy @OpenWeatherApi
+
 runHttp
-  :: (MonadIO m, GetApiKey m, MonadReader Env m)
+  :: (MonadIO m, GetApiKey m, HasRemoteWeatherApiEnv m, Coercible a b)
   => (ApiKey -> ClientM a)
-  -> m (Either RemoteWeatherApiError a)
+  -> m (Either RemoteWeatherApiError b)
 runHttp action = do
-  RemoteWeatherApiEnv {..} <- asks remoteWeatherApiEnv
+  RemoteWeatherApiEnv {..} <- getRemoteWeatherApiEnv
   maybeApiKey              <- getApiKey
   case maybeApiKey of
     Nothing      -> pure . Left $ ApiKeyMissing
     Just apiKey' -> do
       let action' = action (ApiKey apiKey')
       rawResponse <- liftIO $ runClientM action' remoteClientEnv
-      case rawResponse of
-        Left (ConnectionError _) -> pure . Left $ UnableToReachServer
-        Left (FailureResponse _ r)
-          | status r == 404 -> pure . Left $ ZipCodeNotFound
-          | status r == 401 -> pure . Left $ Unauthorized
-        Left  _            -> pure . Left $ MalformedResponse
-        Right responseBody -> pure . Right $ responseBody
+      pure $ case rawResponse of
+        Left (ConnectionError _) -> Left UnableToReachServer
+        Left (FailureResponse _ r) | status r == 404 -> Left ZipCodeNotFound
+                                   | status r == 401 -> Left Unauthorized
+        Left  _            -> Left MalformedResponse
+        Right responseBody -> Right $ coerce responseBody
   where status = fromEnum . responseStatusCode
-
-getWeatherHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
-getWeatherHttp = client $ Proxy @OpenWeatherApi

@@ -6,23 +6,23 @@ import           Weather.Cli.App
 import           Weather.Cli.CommandLineParser
 import           Weather.Cli.Service
 
-import           System.Environment
-import           System.IO
+import           System.Environment             ( getArgs )
+import           System.IO                      ( hPutStrLn
+                                                , stderr
+                                                )
 
 
 main :: IO ()
 main = do
   env     <- makeEnv
-  command <- getCommand
-  result  <- runMonadApp env $ runCommand command
-  case result of
-    Left errors -> do
-      hPutStrLn stderr $ toString errors
-      exitFailure
-    Right output -> do
-      putTextLn output
-      exitSuccess
+  command <- fmap runCommand getCommand
+  runMonadApp env command >>= handleResult
  where
+  handleResult result = case result of
+    Left  errors -> hPutStrLn stderr (toString errors) *> exitFailure
+    Right output -> putTextLn output *> exitSuccess
   getCommand =
-    getArgs <&> fmap toText <&> parseArguments >>= runParseArgsResult
-
+    getArgs 
+      <&> fmap toText 
+      <&> parseArguments 
+      >>= runParseArgsResult
