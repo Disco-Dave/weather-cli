@@ -56,7 +56,7 @@ commandParser = OptParse.info parser infoModifer
 -- * Sub Parsers
 
 setApiKeyParser :: OptParse.ParserInfo Command
-setApiKeyParser = OptParse.info parser infoModifier
+setApiKeyParser = OptParse.info (OptParse.helper <*> parser) infoModifier
  where
   parser       = SetApiKey <$> OptParse.argument OptParse.str modifier
   modifier     = OptParse.metavar "API_KEY" <> OptParse.help helpText
@@ -69,7 +69,7 @@ setApiKeyParser = OptParse.info parser infoModifier
       <> "registered on https://openweathermap.org/"
 
 getCurrentWeather :: OptParse.ParserInfo Command
-getCurrentWeather = OptParse.info parser infoModifer
+getCurrentWeather = OptParse.info (OptParse.helper <*> parser) infoModifer
  where
   parser          = fmap GetCurrentWeather weatherRequestParser
   infoModifer     = OptParse.fullDesc <> OptParse.progDesc descriptionText
