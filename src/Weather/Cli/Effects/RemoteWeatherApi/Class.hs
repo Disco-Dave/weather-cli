@@ -6,18 +6,17 @@ module Weather.Cli.Effects.RemoteWeatherApi.Class
 
 import           Relude
 
-import           Weather.Cli.Types
 import           Weather.Cli.App
+import           Weather.Cli.Effects.ApiKey
 import           Weather.Cli.Effects.RemoteWeatherApi.Env
 
-import           Data.Aeson                     ( FromJSON(..)
-                                                , (.:)
-                                                , withObject
-                                                )
+import           Data.Aeson
 import           Data.Proxy                     ( Proxy(..) )
 import           GHC.Show                       ( Show(..) )
 import           Servant.API
 import           Servant.Client
+
+import qualified Weather.Cli.Types             as Types
 
 
 -- | A error that can occur while interacting with the
@@ -27,104 +26,98 @@ data RemoteWeatherApiError
   | UnableToReachServer
   | MalformedResponse
   | Unauthorized
+  | ApiKeyMissing
 
 instance Show RemoteWeatherApiError where
   show ZipCodeNotFound = "Unable to find the weather for requested zip code."
   show UnableToReachServer = "Unable to reach to the remote server."
   show MalformedResponse = "Response from server was not in the expected format."
-  show Unauthorized = "Unauthorized. This likely due to an invalid API key."
+  show Unauthorized = "Unauthorized. This is likely due to an invalid API key."
+  show ApiKeyMissing = "API Key is not set."
 
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
   -- | Get the weather report.
-  getWeather :: WeatherRequest -> m (Either RemoteWeatherApiError WeatherResponse)
+  getCurrentWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.CurrentWeatherResponse)
 
 
 
 instance RemoteWeatherApi MonadApp where
-  getWeather WeatherRequest {..} = do
-    RemoteWeatherApiEnv {..} <- asks remoteWeatherApiEnv
-
-    let zipCode = fromUsZipCode reqUsZipCode <> ",us"
-        units   = case reqMeasureUnit of
-          Standard -> "standard"
-          Imperial -> "imperial"
-          Metric   -> "metric"
-        requestAction = getWeatherHttp zipCode units remoteApiKey
-        status        = fromEnum . responseStatusCode
-
-    rawResponse <- liftIO $ runClientM requestAction remoteClientEnv
-
-    case rawResponse of
-      Left (ConnectionError _) -> pure . Left $ UnableToReachServer
-      Left (FailureResponse _ r)
-        | status r == 404 -> pure . Left $ ZipCodeNotFound
-        | status r == 401 -> pure . Left $ Unauthorized
-      Left _ -> pure . Left $ MalformedResponse
-      Right responseBody ->
-        case fmap head . nonEmpty $ rawWeather responseBody of
-          Nothing -> pure . Left $ MalformedResponse
-          Just weather ->
-            let RawMain {..}    = rawMain responseBody
-                RawWeather {..} = weather
-            in  pure . Right $ WeatherResponse { respMain           = main
-                                               , respDescription = description
-                                               , respTemperature    = temp
-                                               , respFeelsLike      = feelsLike
-                                               , respMinTemperature = tempMin
-                                               , respMaxTemperature = tempMax
-                                               , respPressure       = pressure
-                                               , respHumidity       = humidity
-                                               }
+  getCurrentWeather Types.WeatherRequest {..} =
+    let zipCode = UsZipCode reqUsZipCode
+        units   = MeasurementUnit reqMeasureUnit
+    in  fmap coerce . runHttp $ getWeatherHttp zipCode units
 
 
-data RawWeather = RawWeather
-  { main :: Text
-  , description :: Text
-  }
+newtype UsZipCode = UsZipCode Types.UsZipCode
 
-instance FromJSON RawWeather where
-  parseJSON = withObject "RawWeather" $ \v ->
-    RawWeather
-      <$> v .: "main"
-      <*> v .: "description"
+instance ToHttpApiData UsZipCode where
+  toUrlPiece (UsZipCode zipCode) = rawZipCode <> ",us"
+    where rawZipCode = Types.fromUsZipCode zipCode
 
-data RawMain = RawMain
-  { temp :: Float
-  , feelsLike :: Float
-  , tempMin :: Float
-  , tempMax :: Float
-  , pressure :: Int
-  , humidity :: Int
-  }
 
-instance FromJSON RawMain where
-  parseJSON = withObject "RawMain" $ \v ->
-    RawMain
-      <$> v .: "temp"
-      <*> v .: "feels_like"
-      <*> v .: "temp_min"
-      <*> v .: "temp_max"
-      <*> v .: "pressure"
-      <*> v .: "humidity"
+newtype MeasurementUnit = MeasurementUnit Types.MeasurementUnit
 
-data RawResponse = RawResponse
-  { rawWeather :: [RawWeather]
-  , rawMain :: RawMain
-  }
+instance ToHttpApiData MeasurementUnit where
+  toUrlPiece (MeasurementUnit measurementUnit) = case measurementUnit of
+    Types.Metric   -> "metric"
+    Types.Imperial -> "imperial"
+    Types.Standard -> "standard"
 
-instance FromJSON RawResponse where
-  parseJSON = withObject "RawResponse" $ \v ->
-    RawResponse
-      <$> v .: "weather"
-      <*> v .: "main"
+instance ToHttpApiData ApiKey where
+  toUrlPiece (ApiKey appId) = appId
 
-type OpenWeatherApi = 
-  "weather" 
-    :> QueryParam' '[Required] "zip" Text
-    :> QueryParam' '[Required] "units" Text
-    :> QueryParam' '[Required] "appid" Text
-    :> Get '[JSON] RawResponse
+newtype ApiKey = ApiKey Text
 
-getWeatherHttp :: Text -> Text -> Text -> ClientM RawResponse
+newtype CurrentWeatherResponse = CurrentWeatherResponse Types.CurrentWeatherResponse
+
+
+instance FromJSON CurrentWeatherResponse where
+  parseJSON = withObject "CurrentWeatherResponse" $ \value -> do
+    rawWeatherArray <- value .: "weather"
+    rawMain         <- value .: "main"
+    case rawWeatherArray of
+      []               -> fail "No weather information was sent"
+      (rawWeather : _) -> do
+        response <- Types.CurrentWeatherResponse
+          <$> rawWeather .: "main"
+          <*> rawWeather .: "description"
+          <*> rawMain    .: "temp"
+          <*> rawMain    .: "feels_like"
+          <*> rawMain    .: "temp_min"
+          <*> rawMain    .: "temp_max"
+          <*> rawMain    .: "pressure" 
+          <*> rawMain    .: "humidity" 
+        pure . CurrentWeatherResponse $ response
+
+
+type OpenWeatherApi =
+  "weather"
+    :> QueryParam' '[Required] "zip" UsZipCode
+    :> QueryParam' '[Required] "units" MeasurementUnit
+    :> QueryParam' '[Required] "appid" ApiKey
+    :> Get '[JSON] CurrentWeatherResponse
+
+runHttp
+  :: (MonadIO m, GetApiKey m, MonadReader Env m)
+  => (ApiKey -> ClientM a)
+  -> m (Either RemoteWeatherApiError a)
+runHttp action = do
+  RemoteWeatherApiEnv {..} <- asks remoteWeatherApiEnv
+  maybeApiKey              <- getApiKey
+  case maybeApiKey of
+    Nothing      -> pure . Left $ ApiKeyMissing
+    Just apiKey' -> do
+      let action' = action (ApiKey apiKey')
+      rawResponse <- liftIO $ runClientM action' remoteClientEnv
+      case rawResponse of
+        Left (ConnectionError _) -> pure . Left $ UnableToReachServer
+        Left (FailureResponse _ r)
+          | status r == 404 -> pure . Left $ ZipCodeNotFound
+          | status r == 401 -> pure . Left $ Unauthorized
+        Left  _            -> pure . Left $ MalformedResponse
+        Right responseBody -> pure . Right $ responseBody
+  where status = fromEnum . responseStatusCode
+
+getWeatherHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
 getWeatherHttp = client $ Proxy @OpenWeatherApi

@@ -1,27 +1,43 @@
-module Weather.Cli.Service where
+module Weather.Cli.Service
+  ( runCommand
+  )
+where
 
 import           Relude
 
-import           Weather.Cli.Effects.ReadFromConsole        ( ReadFromConsole )
 import           Weather.Cli.Effects.RemoteWeatherApi.Class ( RemoteWeatherApi )
-import           Weather.Cli.Effects.WriteToConsole         ( WriteToConsole )
+import           Weather.Cli.Effects.ApiKey                 ( GetApiKey
+                                                            , SetApiKey
+                                                            )
 import           Weather.Cli.Types
 
-import qualified Weather.Cli.Effects.ReadFromConsole        as ReadFromConsole
 import qualified Weather.Cli.Effects.RemoteWeatherApi.Class as RemoteWeatherApi
-import qualified Weather.Cli.Effects.WriteToConsole         as WriteToConsole
+import qualified Weather.Cli.Effects.ApiKey                 as ApiKey
+
+runCommand 
+  :: ( RemoteWeatherApi m
+     , GetApiKey m
+     , SetApiKey m
+     ) 
+  => Command 
+  -> m (Either Text Text)
+runCommand (SetApiKey         apiKey ) = setApiKey apiKey
+runCommand (GetCurrentWeather request) = getCurrentWeather request
 
 
-reportWeather :: (WriteToConsole m, RemoteWeatherApi m, ReadFromConsole m) => m ()
-reportWeather = do
-  req@WeatherRequest {..} <- ReadFromConsole.getRequest
-  RemoteWeatherApi.getWeather req >>= either
-    (WriteToConsole.writeLineToStdErr . show)
-    (WriteToConsole.writeLineToStdOut . formatWeather reqMeasureUnit)
+-- * Handle SetApiKey command
+setApiKey :: SetApiKey m => Text -> m (Either Text Text)
+setApiKey apiKey = ApiKey.setApiKey apiKey $> Right "API Key was set."
 
 
-formatWeather :: MeasurementUnit -> WeatherResponse -> Text
-formatWeather unit WeatherResponse {..} =
+-- * Handle GetCurrentWeather command
+getCurrentWeather :: (GetApiKey m, RemoteWeatherApi m) => WeatherRequest -> m (Either Text Text)
+getCurrentWeather r@WeatherRequest {..} =
+  RemoteWeatherApi.getCurrentWeather r
+    <&> bimap show (formatWeather reqMeasureUnit)
+
+formatWeather :: MeasurementUnit -> CurrentWeatherResponse -> Text
+formatWeather unit CurrentWeatherResponse {..} =
   "Weather: " <> weather <> "\n"
     <> "Temperature: " <> temperature <> "\n"
     <> "Min temperature: " <> minTemperature <> "\n"
