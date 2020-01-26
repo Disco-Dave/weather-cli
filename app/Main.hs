@@ -2,18 +2,27 @@ module Main where
 
 import           Relude
 
-import           Weather.Cli.ApiKey
 import           Weather.Cli.App
+import           Weather.Cli.CommandLineParser
 import           Weather.Cli.Service
 
-import           Weather.Cli.CommandLineParser
-
 import           System.Environment
+import           System.IO
 
-getArgsText :: IO [Text]
-getArgsText = fmap toText <$> getArgs
 
 main :: IO ()
-main = do -- getArgsText >>= (runParseArgsResult . parseArguments) >>= print
-  env <- getApiKey >>= makeEnv
-  runMonadApp env reportWeather
+main = do
+  env     <- makeEnv
+  command <- getCommand
+  result  <- runMonadApp env $ runCommand command
+  case result of
+    Left errors -> do
+      hPutStrLn stderr $ toString errors
+      exitFailure
+    Right output -> do
+      putTextLn output
+      exitSuccess
+ where
+  getCommand =
+    getArgs <&> fmap toText <&> parseArguments >>= runParseArgsResult
+

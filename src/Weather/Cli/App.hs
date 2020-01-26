@@ -11,8 +11,8 @@ newtype Env = Env
   { remoteWeatherApiEnv :: RemoteWeatherApiEnv
   }
 
-makeEnv :: MonadIO m => Text -> m Env
-makeEnv = fmap Env . makeRemoteWeatherApiEnv
+makeEnv :: MonadIO m => m Env
+makeEnv = fmap Env makeRemoteWeatherApiEnv
 
 runMonadApp :: Env -> MonadApp a -> IO a
 runMonadApp env = usingReaderT env . fromMonadApp
