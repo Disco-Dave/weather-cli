@@ -17,15 +17,14 @@ import           Weather.Cli.Types
 import qualified Weather.Cli.Effects.RemoteWeatherApi.Class as RemoteWeatherApi
 import qualified Weather.Cli.Effects.ApiKey                 as ApiKey
 
-runCommand 
-  :: ( RemoteWeatherApi m
-     , GetApiKey m
-     , SetApiKey m
-     ) 
-  => Command 
+runCommand
+  :: (RemoteWeatherApi m, GetApiKey m, SetApiKey m)
+  => Command
   -> m (Either Text Text)
 runCommand (SetApiKey         apiKey ) = setApiKey apiKey
 runCommand (GetCurrentWeather request) = getCurrentWeather request
+runCommand (GetHourlyWeather  _      ) = pure . Left $ "Not yet implemeneted."
+runCommand (GetDailyWeather   _      ) = pure . Left $ "Not yet implemeneted."
 
 
 -- * Handle SetApiKey command

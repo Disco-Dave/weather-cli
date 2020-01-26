@@ -50,6 +50,8 @@ commandParser = OptParse.info parser infoModifer
   commands =
     OptParse.command "set" setApiKeyParser
       <> OptParse.command "current" getCurrentWeather
+      <> OptParse.command "hourly" getHourlyWeather
+      <> OptParse.command "daily" getDailyWeather
 
 
 
@@ -69,11 +71,19 @@ setApiKeyParser = OptParse.info (OptParse.helper <*> parser) infoModifier
       <> "registered on https://openweathermap.org/"
 
 getCurrentWeather :: OptParse.ParserInfo Command
-getCurrentWeather = OptParse.info (OptParse.helper <*> parser) infoModifer
+getCurrentWeather = weatherReport GetCurrentWeather "Get the current weather"
+
+getHourlyWeather :: OptParse.ParserInfo Command
+getHourlyWeather = weatherReport GetHourlyWeather "Get the hourly weather"
+
+getDailyWeather :: OptParse.ParserInfo Command
+getDailyWeather = weatherReport GetDailyWeather "Get the daily weather"
+
+weatherReport :: (WeatherRequest -> a) -> String -> OptParse.ParserInfo a
+weatherReport constructor description = OptParse.info parser infoModifer
  where
-  parser          = fmap GetCurrentWeather weatherRequestParser
-  infoModifer     = OptParse.fullDesc <> OptParse.progDesc descriptionText
-  descriptionText = "Get the current weather"
+  parser      = OptParse.helper <*> fmap constructor weatherRequestParser
+  infoModifer = OptParse.fullDesc <> OptParse.progDesc description
 
 weatherRequestParser :: OptParse.Parser WeatherRequest
 weatherRequestParser =

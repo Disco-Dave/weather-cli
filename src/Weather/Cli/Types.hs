@@ -13,6 +13,8 @@ module Weather.Cli.Types
   -- * Request/Response
   , WeatherRequest(..)
   , CurrentWeatherResponse(..)
+  , HourlyWeatherResponse(..)
+  , DailyWeatherResponse(..)
 
   -- * Commands
   , Command(..)
@@ -105,10 +107,15 @@ data CurrentWeatherResponse = CurrentWeatherResponse
   , respHumidity :: Int
   } deriving Show
 
+data HourlyWeatherResponse
+
+data DailyWeatherResponse
 
 -- * Commands
 
 data Command
   = SetApiKey Text
   | GetCurrentWeather WeatherRequest
+  | GetHourlyWeather WeatherRequest
+  | GetDailyWeather WeatherRequest
   deriving Show
