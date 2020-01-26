@@ -12,6 +12,7 @@ import           Weather.Cli.Effects.RemoteWeatherApi.Env
 
 import           Data.Aeson
 import           Data.Proxy                     ( Proxy(..) )
+import           GHC.TypeLits
 import           Servant.API
 import           Servant.Client
 
@@ -29,41 +30,35 @@ data RemoteWeatherApiError
 
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
-  -- | Get the weather report.
   getCurrentWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.CurrentWeatherResponse)
-
-
+  getHourlyWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.HourlyWeatherResponse)
+  getDailyWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.DailyWeatherResponse)
 
 instance RemoteWeatherApi MonadApp where
-  getCurrentWeather Types.WeatherRequest {..} =
-    let zipCode = UsZipCode reqUsZipCode
-        units   = MeasurementUnit reqMeasureUnit
-    in  runHttp $ getWeatherHttp zipCode units
+  getCurrentWeather = getWeather getCurrentHttp
+  getHourlyWeather  = getWeather getHourlyHttp
+  getDailyWeather   = getWeather getDailyHttp
 
+
+-- * Newtypes and type classes for API
 
 newtype UsZipCode = UsZipCode Types.UsZipCode
-
 instance ToHttpApiData UsZipCode where
   toUrlPiece (UsZipCode zipCode) = rawZipCode <> ",us"
     where rawZipCode = Types.fromUsZipCode zipCode
 
-
 newtype MeasurementUnit = MeasurementUnit Types.MeasurementUnit
-
 instance ToHttpApiData MeasurementUnit where
   toUrlPiece (MeasurementUnit measurementUnit) = case measurementUnit of
     Types.Metric   -> "metric"
     Types.Imperial -> "imperial"
     Types.Standard -> "standard"
 
+newtype ApiKey = ApiKey Text
 instance ToHttpApiData ApiKey where
   toUrlPiece (ApiKey appId) = appId
 
-newtype ApiKey = ApiKey Text
-
 newtype CurrentWeatherResponse = CurrentWeatherResponse Types.CurrentWeatherResponse
-
-
 instance FromJSON CurrentWeatherResponse where
   parseJSON = withObject "CurrentWeatherResponse" $ \value -> do
     rawWeatherArray <- value .: "weather"
@@ -82,16 +77,38 @@ instance FromJSON CurrentWeatherResponse where
           <*> rawMain    .: "humidity" 
         pure . CurrentWeatherResponse $ response
 
+newtype HourlyWeatherResponse = HourlyWeatherResponse Types.HourlyWeatherResponse
+instance FromJSON HourlyWeatherResponse where
+  parseJSON = withObject "HourlyWeatherResponse" $ \_ ->
+    pure $ HourlyWeatherResponse Types.HourlyWeatherResponse
+
+newtype DailyWeatherResponse = DailyWeatherResponse Types.DailyWeatherResponse
+instance FromJSON DailyWeatherResponse where
+  parseJSON = withObject "DailyWeatherResponse" $ \_ ->
+    pure $ DailyWeatherResponse Types.DailyWeatherResponse
+
+
+-- * Open Weather API
 
 type OpenWeatherApi =
-  "weather"
+  WeatherReport "weather" CurrentWeatherResponse
+  :<|> WeatherReport "hourly" HourlyWeatherResponse
+  :<|> WeatherReport "daily" DailyWeatherResponse
+
+getCurrentHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
+getHourlyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM HourlyWeatherResponse
+getDailyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM DailyWeatherResponse
+(getCurrentHttp :<|> getHourlyHttp :<|> getDailyHttp) = client $ Proxy @OpenWeatherApi
+
+
+-- * Helpers
+
+type WeatherReport (name :: Symbol) (response :: Type) =
+  name 
     :> QueryParam' '[Required] "zip" UsZipCode
     :> QueryParam' '[Required] "units" MeasurementUnit
     :> QueryParam' '[Required] "appid" ApiKey
-    :> Get '[JSON] CurrentWeatherResponse
-
-getWeatherHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
-getWeatherHttp = client $ Proxy @OpenWeatherApi
+    :> Get '[JSON] response
 
 runHttp
   :: (MonadIO m, GetApiKey m, HasRemoteWeatherApiEnv m, Coercible a b)
@@ -112,3 +129,13 @@ runHttp action = do
         Left  _            -> Left MalformedResponse
         Right responseBody -> Right $ coerce responseBody
   where status = fromEnum . responseStatusCode
+
+getWeather
+  :: (MonadIO m, GetApiKey m, HasRemoteWeatherApiEnv m, Coercible a b)
+  => (UsZipCode -> MeasurementUnit -> ApiKey -> ClientM a)
+  -> Types.WeatherRequest
+  -> m (Either RemoteWeatherApiError b)
+getWeather action Types.WeatherRequest {..} = runHttp $ action zipCode units
+ where
+  zipCode = UsZipCode reqUsZipCode
+  units   = MeasurementUnit reqMeasureUnit

@@ -107,9 +107,9 @@ data CurrentWeatherResponse = CurrentWeatherResponse
   , respHumidity :: Int
   } deriving Show
 
-data HourlyWeatherResponse
+data HourlyWeatherResponse = HourlyWeatherResponse
 
-data DailyWeatherResponse
+data DailyWeatherResponse = DailyWeatherResponse
 
 -- * Commands
 
