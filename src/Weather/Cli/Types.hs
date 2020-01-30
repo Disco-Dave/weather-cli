@@ -12,7 +12,7 @@ module Weather.Cli.Types
 
   -- * Request/Response
   , WeatherRequest(..)
-  , CurrentWeatherResponse(..)
+  , WeatherReport(..)
   , HourlyWeatherResponse(..)
   , DailyWeatherResponse(..)
 
@@ -28,6 +28,7 @@ import           Relude
 
 import           Data.Char                      ( isDigit )
 import           Data.Maybe                     ( catMaybes )
+import           Data.Time                      ( UTCTime )
 import           Relude.Extra.Validation        ( Validation(..) )
 
 import qualified Data.Set                      as Set
@@ -96,18 +97,21 @@ data WeatherRequest = WeatherRequest
   } deriving Show
 
 -- | A response that describes the weather.
-data CurrentWeatherResponse = CurrentWeatherResponse
-  { respMain :: Text 
-  , respDescription :: Text
-  , respTemperature :: Float
-  , respFeelsLike :: Float
-  , respMinTemperature :: Float
-  , respMaxTemperature :: Float
-  , respPressure :: Int
-  , respHumidity :: Int
+data WeatherReport = WeatherReport
+  { weatherMain :: Text 
+  , weatherDescription :: Text
+  , weatherTemperature :: Float
+  , weatherFeelsLike :: Float
+  , weatherMinTemperature :: Float
+  , weatherMaxTemperature :: Float
+  , weatherPressure :: Int
+  , weatherHumidity :: Int
   } deriving Show
 
 data HourlyWeatherResponse = HourlyWeatherResponse
+  { hourlyDate :: UTCTime
+  , hourlyWeather :: WeatherReport
+  } deriving Show
 
 data DailyWeatherResponse = DailyWeatherResponse
 

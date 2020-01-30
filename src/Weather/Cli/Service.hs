@@ -23,7 +23,7 @@ runCommand
   -> m (Either Text Text)
 runCommand (SetApiKey         apiKey ) = setApiKey apiKey
 runCommand (GetCurrentWeather request) = getCurrentWeather request
-runCommand (GetHourlyWeather  _      ) = pure . Left $ "Not yet implemeneted."
+runCommand (GetHourlyWeather  request) = getHourlyWeather request
 runCommand (GetDailyWeather   _      ) = pure . Left $ "Not yet implemeneted."
 
 
@@ -38,8 +38,8 @@ getCurrentWeather r@WeatherRequest {..} =
   RemoteWeatherApi.getCurrentWeather r
     <&> bimap errorToText (formatWeather reqMeasureUnit)
 
-formatWeather :: MeasurementUnit -> CurrentWeatherResponse -> Text
-formatWeather unit CurrentWeatherResponse {..} =
+formatWeather :: MeasurementUnit -> WeatherReport -> Text
+formatWeather unit WeatherReport {..} =
   "Weather: " <> weather <> "\n"
     <> "Temperature: " <> temperature <> "\n"
     <> "Min temperature: " <> minTemperature <> "\n"
@@ -48,18 +48,23 @@ formatWeather unit CurrentWeatherResponse {..} =
     <> "Pressure: " <> pressure <> "\n"
     <> "Humidity: " <> humidity
  where
-  temperature     = show respTemperature <> " " <> temperatureUnit
-  minTemperature  = show respMinTemperature <> " " <> temperatureUnit
-  maxTemperature  = show respMaxTemperature <> " " <> temperatureUnit
-  feelsLike       = show respFeelsLike <> " " <> temperatureUnit
-  weather         = toText respMain <> " - " <> toText respDescription
-  pressure        = show respPressure <> " hPa"
-  humidity        = show respHumidity <> "%"
+  temperature     = show weatherTemperature <> " " <> temperatureUnit
+  minTemperature  = show weatherMinTemperature <> " " <> temperatureUnit
+  maxTemperature  = show weatherMaxTemperature <> " " <> temperatureUnit
+  feelsLike       = show weatherFeelsLike <> " " <> temperatureUnit
+  weather         = toText weatherMain <> " - " <> toText weatherDescription
+  pressure        = show weatherPressure <> " hPa"
+  humidity        = show weatherHumidity <> "%"
   temperatureUnit = case unit of
     Imperial -> "°F"
     Metric   -> "°C"
     Standard -> "K"
 
+
+-- * Handle GetHourlyWeather
+getHourlyWeather :: (GetApiKey m, RemoteWeatherApi m) => WeatherRequest -> m (Either Text Text)
+getHourlyWeather r@WeatherRequest {..} =
+  RemoteWeatherApi.getHourlyWeather r <&> bimap errorToText show
 
 
 -- * Shared functions

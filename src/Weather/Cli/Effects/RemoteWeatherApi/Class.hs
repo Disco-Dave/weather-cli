@@ -18,8 +18,6 @@ import           Servant.Client
 
 import qualified Weather.Cli.Types             as Types
 
-import qualified Data.Time                     as Time
-
 
 -- | A error that can occur while interacting with the
 -- remote weather API.
@@ -32,7 +30,7 @@ data RemoteWeatherApiError
 
 -- | An effect for interacting with a remote weather API.
 class Monad m => RemoteWeatherApi m where
-  getCurrentWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.CurrentWeatherResponse)
+  getCurrentWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.WeatherReport)
   getHourlyWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.HourlyWeatherResponse)
   getDailyWeather :: Types.WeatherRequest -> m (Either RemoteWeatherApiError Types.DailyWeatherResponse)
 
@@ -61,15 +59,15 @@ newtype ApiKey = ApiKey Text
 instance ToHttpApiData ApiKey where
   toUrlPiece (ApiKey apiKey) = apiKey
 
-newtype CurrentWeatherResponse = CurrentWeatherResponse Types.CurrentWeatherResponse
-instance FromJSON CurrentWeatherResponse where
-  parseJSON = withObject "CurrentWeatherResponse" $ \value -> do
-    rawWeatherArray <- value .: "weather"
-    rawMain         <- value .: "main"
+newtype WeatherReport = WeatherReport {fromWeatherReport :: Types.WeatherReport}
+instance FromJSON WeatherReport where
+  parseJSON = withObject "WeatherReport" $ \obj -> do
+    rawWeatherArray <- obj .: "weather"
+    rawMain         <- obj .: "main"
     case rawWeatherArray of
       []               -> fail "No weather information was sent"
       (rawWeather : _) -> do
-        response <- Types.CurrentWeatherResponse
+        response <- Types.WeatherReport
           <$> rawWeather .: "main"
           <*> rawWeather .: "description"
           <*> rawMain    .: "temp"
@@ -78,12 +76,20 @@ instance FromJSON CurrentWeatherResponse where
           <*> rawMain    .: "temp_max"
           <*> rawMain    .: "pressure"
           <*> rawMain    .: "humidity"
-        pure . CurrentWeatherResponse $ response
+        pure . WeatherReport $ response
 
 newtype HourlyWeatherResponse = HourlyWeatherResponse Types.HourlyWeatherResponse
 instance FromJSON HourlyWeatherResponse where
-  parseJSON = withObject "HourlyWeatherResponse" $ \_ ->
-    pure $ HourlyWeatherResponse Types.HourlyWeatherResponse
+  parseJSON = withObject "HourlyWeatherResponse" $ \obj -> do
+    resp <-
+      Types.HourlyWeatherResponse
+        <$> obj .:  "dt"
+        <*> (fromWeatherReport <$> parseJSON (Object obj))
+    pure . HourlyWeatherResponse $ resp
+
+instance {-# OVERLAPPING#-} FromJSON [HourlyWeatherResponse] where
+  parseJSON = withObject "HourlyWeatherResponse" $ \obj -> obj .: "list"
+
 
 newtype DailyWeatherResponse = DailyWeatherResponse Types.DailyWeatherResponse
 instance FromJSON DailyWeatherResponse where
@@ -95,11 +101,13 @@ instance FromJSON DailyWeatherResponse where
 -- * Open Weather API
 
 type OpenWeatherApi =
-  WeatherReport "weather" CurrentWeatherResponse
-  :<|> WeatherReport "hourly" HourlyWeatherResponse
-  :<|> WeatherReport "daily" DailyWeatherResponse
+  Weather "weather" WeatherReport
+  :<|> "forecast" :>
+    ( Weather "hourly" HourlyWeatherResponse
+    :<|> Weather "daily" DailyWeatherResponse
+    )
 
-getCurrentHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM CurrentWeatherResponse
+getCurrentHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM WeatherReport
 getHourlyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM HourlyWeatherResponse
 getDailyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM DailyWeatherResponse
 (getCurrentHttp :<|> getHourlyHttp :<|> getDailyHttp) = client $ Proxy @OpenWeatherApi
@@ -107,7 +115,7 @@ getDailyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM DailyWeatherRe
 
 -- * Helpers
 
-type WeatherReport (name :: Symbol) (response :: Type) =
+type Weather (name :: Symbol) (response :: Type) =
   name
     :> QueryParam' '[Required] "zip" UsZipCode
     :> QueryParam' '[Required] "units" MeasurementUnit
@@ -128,8 +136,8 @@ runHttp action = do
       rawResponse <- liftIO $ runClientM action' remoteClientEnv
       pure $ case rawResponse of
         Left (ConnectionError _) -> Left UnableToReachServer
-        Left (FailureResponse _ r) | status r == 404 -> Left ZipCodeNotFound
-                                   | status r == 401 -> Left Unauthorized
+        Left (FailureResponse _ r) | status r == 404 -> traceShow r $ Left ZipCodeNotFound
+                                   | status r == 401 -> traceShow r $ Left Unauthorized
         Left  _            -> Left MalformedResponse
         Right responseBody -> Right $ coerce responseBody
   where status = fromEnum . responseStatusCode
