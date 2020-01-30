@@ -18,6 +18,8 @@ import           Servant.Client
 
 import qualified Weather.Cli.Types             as Types
 
+import qualified Data.Time                     as Time
+
 
 -- | A error that can occur while interacting with the
 -- remote weather API.
@@ -40,6 +42,7 @@ instance RemoteWeatherApi MonadApp where
   getDailyWeather   = getWeather getDailyHttp
 
 
+
 -- * Newtypes and type classes for API
 
 newtype UsZipCode = UsZipCode Types.UsZipCode
@@ -56,7 +59,7 @@ instance ToHttpApiData MeasurementUnit where
 
 newtype ApiKey = ApiKey Text
 instance ToHttpApiData ApiKey where
-  toUrlPiece (ApiKey appId) = appId
+  toUrlPiece (ApiKey apiKey) = apiKey
 
 newtype CurrentWeatherResponse = CurrentWeatherResponse Types.CurrentWeatherResponse
 instance FromJSON CurrentWeatherResponse where
@@ -73,8 +76,8 @@ instance FromJSON CurrentWeatherResponse where
           <*> rawMain    .: "feels_like"
           <*> rawMain    .: "temp_min"
           <*> rawMain    .: "temp_max"
-          <*> rawMain    .: "pressure" 
-          <*> rawMain    .: "humidity" 
+          <*> rawMain    .: "pressure"
+          <*> rawMain    .: "humidity"
         pure . CurrentWeatherResponse $ response
 
 newtype HourlyWeatherResponse = HourlyWeatherResponse Types.HourlyWeatherResponse
@@ -86,6 +89,7 @@ newtype DailyWeatherResponse = DailyWeatherResponse Types.DailyWeatherResponse
 instance FromJSON DailyWeatherResponse where
   parseJSON = withObject "DailyWeatherResponse" $ \_ ->
     pure $ DailyWeatherResponse Types.DailyWeatherResponse
+
 
 
 -- * Open Weather API
@@ -104,7 +108,7 @@ getDailyHttp :: UsZipCode -> MeasurementUnit -> ApiKey -> ClientM DailyWeatherRe
 -- * Helpers
 
 type WeatherReport (name :: Symbol) (response :: Type) =
-  name 
+  name
     :> QueryParam' '[Required] "zip" UsZipCode
     :> QueryParam' '[Required] "units" MeasurementUnit
     :> QueryParam' '[Required] "appid" ApiKey
